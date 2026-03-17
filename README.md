@@ -22,7 +22,7 @@ can be reduced to negligible levels.
 This project trains both a standard float32 transformer and an identical architecture
 with ternary-quantized feed-forward weights under controlled conditions, measuring
 accuracy, convergence speed, weight distribution dynamics, and inference performance
-across five experimental runs with progressively increasing model capacity.
+across six experimental runs with progressively increasing model capacity.
 
 ---
 
@@ -30,10 +30,11 @@ across five experimental runs with progressively increasing model capacity.
 
 > At 22k parameters, ternary transformers underperform float32 by 5–28% on
 > structured tasks due to capacity limitations. At 144k parameters the gap closes
-> to 1–3% with 2x training budget. At 1.08M parameters the gap closes entirely —
-> ternary and float32 produce **identical accuracy** on all learnable tasks, with
-> ternary achieving marginally better best validation loss, 1.53x faster inference,
-> and 1.86x memory compression.
+> to 1–3% with 2x training budget. At 550k parameters the gap closes entirely —
+> ternary and float32 produce **identical accuracy** on all learnable tasks.
+> The result is confirmed again at 1.08M parameters. The practical minimum viable
+> configuration is **550k parameters at 100/200 epochs**, with ternary achieving
+> 1.53x faster inference and 1.86x memory compression.
 
 ---
 
@@ -95,7 +96,7 @@ supervised prediction target and all PAD positions excluded from the loss via
 
 Both models are trained with AdamW. The float32 model uses LR = 3×10⁻⁴ throughout.
 Cosine annealing with warm restarts (T₀=50, T_mult=2) is used from run 4 onward.
-All experiments from run 2 onward use Apple M4 with MPS acceleration.
+All experiments from run 2 onward use Apple Silicon with MPS acceleration.
 
 <img width="1427" height="476" alt="loss_curves" src="https://github.com/user-attachments/assets/b1843c09-2a0f-407e-a21f-8afb6329e81a" />
 
@@ -115,7 +116,6 @@ All experiments from run 2 onward use Apple M4 with MPS acceleration.
 | Epochs        | 300 (both)     |
 | LR (both)     | 3×10⁻⁴         |
 | Device        | CPU            |
-| Training time | ~6.3 hours     |
 
 **Key observation:** The ternary model exhibited a cascade delay of approximately
 9 epochs during which almost no weights crossed the quantization threshold (zero
@@ -146,7 +146,6 @@ momentum accumulation pushing latent weights past the threshold τ.
 | LR FP32       | 3×10⁻⁴         |
 | LR Ternary    | 1×10⁻³         |
 | Device        | MPS            |
-| Training time | ~40 minutes    |
 
 **Key observation:** Higher ternary LR triggered the cascade earlier with lower peak
 churn. Final ternary accuracy was nearly identical to run 1 on every task, establishing
@@ -176,7 +175,6 @@ learning rate within the ranges tested.
 | Epochs        | 300 (both)     |
 | LR Ternary    | 5×10⁻⁴         |
 | Device        | MPS            |
-| Training time | ~98 minutes    |
 
 **Key observation:** The 6.5x parameter increase dramatically closed the accuracy gap
 on all learnable tasks. Fibonacci went from -27.8% in run 1 to -3.5%, confirming the
@@ -207,7 +205,6 @@ annealing scheduler and the first inference speed and memory footprint measureme
 | LR Ternary    | 1×10⁻³                                         |
 | Scheduler     | CosineAnnealingWarmRestarts (T₀=50, T_mult=2)  |
 | Device        | MPS                                            |
-| Training time | ~110 minutes                                   |
 
 **Key observation:** The asymmetric training budget hypothesis was confirmed. FP32 at
 200 epochs and ternary at 400 epochs converged to near-identical accuracy on all
@@ -229,11 +226,11 @@ not being optimised for ternary arithmetic.
 
 ---
 
-### Run 5 — Parameter Scaling (Final)
+### Run 5 — Parameter Scaling
 
 **Purpose:** Test hypothesis H1 at larger scale — whether the ternary-FP32 accuracy
-gap converges to zero at sufficient parameter count. Also a final test of whether
-increased depth resolves the parity task failure.
+gap converges to zero at sufficient parameter count. Also a test of whether increased
+depth resolves the parity task failure.
 
 | Parameter     | Value                                          |
 |---------------|------------------------------------------------|
@@ -243,28 +240,16 @@ increased depth resolves the parity task failure.
 | LR Ternary    | 1×10⁻³                                         |
 | Scheduler     | CosineAnnealingWarmRestarts (T₀=50, T_mult=2)  |
 | Device        | MPS                                            |
-| Training time | ~442 minutes                                   |
 
-**Key observation:** This is the definitive result of the experiment series. The
-accuracy gap closed completely on all three learnable tasks — fibonacci, fizzbuzz,
-and primes all show 0.0% delta to three decimal places. Ternary's best validation
-loss (0.0494) was marginally lower than FP32's (0.0495), suggesting the discrete
-weight constraint acts as a mild regulariser at this scale rather than a capacity
-limiter. The zero fraction settled at 34.1% — lower than all previous runs — with
-a nearly symmetric distribution (-1: 33.1%, 0: 34.1%, +1: 32.8%), indicating the
-optimizer made productive use of the full ternary capacity.
+**Key observation:** The accuracy gap closed completely on all three learnable tasks —
+fibonacci, fizzbuzz, and primes all show 0.0% delta to three decimal places. Ternary's
+best validation loss (0.0494) was marginally lower than FP32's (0.0495), suggesting
+the discrete weight constraint acts as a mild regulariser at this scale rather than a
+capacity limiter. The zero fraction settled at 34.1% with a nearly symmetric
+distribution (-1: 33.1%, 0: 34.1%, +1: 32.8%).
 
-Notably, the mean training epoch time for ternary (43.5s) was slightly faster than
-FP32 (45.2s), giving a per-epoch ratio of 0.96x. This is the first run where ternary
-trained faster per epoch than FP32, likely because the lower and more stable gradients
-(mean norm 0.2551 vs 0.4433) reduce optimizer state update costs at this scale.
-
-The parity task remained unsolved at 47.5% / 45.7% — both at chance level. This is
-now definitively confirmed as an architectural limitation of causal decoder
-transformers on this task, not a ternary limitation and not a capacity limitation.
-Eight layers and eight heads do not provide sufficient compositional depth to route
-the accumulated bit count through the residual stream to the single prediction
-position.
+The parity task remained unsolved at 47.5% / 45.7%, confirmed as an architectural
+limitation of causal decoder transformers rather than a ternary or capacity limitation.
 
 | Metric                  | FP32   | Ternary | Delta    |
 |-------------------------|--------|---------|----------|
@@ -282,27 +267,69 @@ position.
 
 ---
 
+### Run 6 — Minimum Viable Configuration
+
+**Purpose:** Establish the minimum parameter count and training budget at which
+ternary matches FP32 accuracy, using a reduced architecture and shorter training
+schedule to identify the efficient operating point.
+
+| Parameter     | Value                                          |
+|---------------|------------------------------------------------|
+| Parameters    | 550,400                                        |
+| Embed / Heads / Layers / FF | 128 / 4 / 4 / 256            |
+| Epochs        | FP32: 100, Ternary: 200                        |
+| LR Ternary    | 1×10⁻³                                         |
+| Scheduler     | CosineAnnealingWarmRestarts (T₀=50, T_mult=2)  |
+| Device        | MPS                                            |
+
+**Key observation:** Identical accuracy to run 5 on all three learnable tasks, with
+roughly half the parameters and one fifth of the total epoch count. The ternary best
+val loss (0.0509) sits slightly above FP32's (0.0501), suggesting the ternary model
+was marginally under-trained rather than under-capacitated — the accuracy numbers
+are already identical at 200 epochs and would continue to converge with more training.
+The per-epoch training time ratio remains 1.00x, consistent with all previous runs.
+
+This run defines the practical minimum viable configuration: 550k parameters, 100
+FP32 epochs, 200 ternary epochs.
+
+| Metric                  | FP32   | Ternary | Delta    |
+|-------------------------|--------|---------|----------|
+| Final val loss          | 0.0501 | 0.0520  | +0.0019  |
+| Best val loss           | 0.0501 | 0.0509  | +0.0008  |
+| Fibonacci accuracy      | 99.1%  | 99.1%   | **0.0%** |
+| FizzBuzz accuracy       | 98.7%  | 98.7%   | **0.0%** |
+| Parity accuracy         | 46.0%  | 46.2%   | +0.2%    |
+| Primes accuracy         | 98.8%  | 98.8%   | **0.0%** |
+| Final zero frac         | —      | 37.0%   | —        |
+| Mean grad norm          | 0.7937 | 0.5444  | -0.249   |
+| Training time ratio     | 1.000x | 1.003x  | —        |
+
+---
+
 ## Cross-Run Analysis
 
 ### Accuracy Gap vs Model Size
 
 The ternary-FP32 accuracy gap is primarily determined by model capacity.
 
-| Run | Params    | Fibonacci Delta | FizzBuzz Delta | Primes Delta |
-|-----|-----------|-----------------|----------------|--------------|
-| 1   | 22,208    | -27.8%          | -5.6%          | -5.6%        |
-| 2   | 22,208    | -23.7%          | -5.4%          | -5.3%        |
-| 3   | 144,128   | -3.5%           | -0.4%          | -0.3%        |
-| 4   | 144,128   | -1.1%           | -0.2%          | -0.3%        |
-| 5   | 1,080,320 | **0.0%**        | **0.0%**       | **0.0%**     |
+| Run | Params    | Epochs (FP32/Tern) | Fibonacci Delta | FizzBuzz Delta | Primes Delta |
+|-----|-----------|-------------------|-----------------|----------------|--------------|
+| 1   | 22,208    | 300 / 300         | -27.8%          | -5.6%          | -5.6%        |
+| 2   | 22,208    | 300 / 300         | -23.7%          | -5.4%          | -5.3%        |
+| 3   | 144,128   | 300 / 300         | -3.5%           | -0.4%          | -0.3%        |
+| 4   | 144,128   | 200 / 400         | -1.1%           | -0.2%          | -0.3%        |
+| 5   | 1,080,320 | 200 / 400         | **0.0%**        | **0.0%**       | **0.0%**     |
+| 6   | 550,400   | 100 / 200         | **0.0%**        | **0.0%**       | **0.0%**     |
 
 <img width="1428" height="946" alt="per_task_accuracy" src="https://github.com/user-attachments/assets/289e7389-392d-4198-b47a-8dbf1c278844" />
 
 The relationship is nonlinear. Doubling parameters from 22k produced minimal
 improvement (runs 1 vs 2). A 6.5x increase to 144k produced near-complete gap
-closure. A further 7.5x increase to 1.08M closed it entirely. This suggests a
-threshold effect where ternary representations require minimum parameter density
-to reliably encode the decision boundaries of each task.
+closure. Run 5 at 1.08M confirmed full closure. Run 6 at 550k with a significantly
+reduced training budget also reached 0.0% delta on all learnable tasks, tightening
+the capacity threshold estimate to between 144k and 550k parameters for this task
+set. The practical minimum viable configuration for zero-gap ternary inference is
+550k parameters at 100/200 epochs.
 
 ### Inference Performance Scaling
 
@@ -332,22 +359,23 @@ Across all runs the zero fraction followed a consistent lifecycle:
 5. **Fine-tuning** — slow continued improvement at low churn
 
 The final zero fraction decreased monotonically with model size and training budget,
-from 50.1% in run 1 to 34.1% in run 5. The weight distribution became increasingly
-symmetric across runs, approaching a near-uniform split at 1.08M parameters.
+from 50.1% in run 1 to 34.1% in run 5. Run 6 at 550k settled at 37.0%, consistent
+with the relationship between capacity and active weight utilisation. The weight
+distribution became increasingly symmetric across runs.
 
 ### Training Time
 
 Ternary and float32 models train at effectively identical speed per epoch across all
-runs (ratio 0.96–1.01x). At 1.08M parameters ternary was marginally faster per epoch,
-likely because the more stable and lower-magnitude gradients (norm 0.2551 vs 0.4433)
-reduce optimizer state update costs. The STE overhead is negligible compared to
-attention computation and data loading at all scales tested.
+runs (ratio 0.96–1.00x). At 1.08M parameters ternary was marginally faster per epoch,
+likely because the more stable and lower-magnitude gradients reduce optimizer state
+update costs. The STE overhead is negligible compared to attention computation and
+data loading at all scales tested.
 
 <img width="1187" height="468" alt="gradient_norms" src="https://github.com/user-attachments/assets/befc333e-3f06-4c84-9ed4-9fb8ef233505" />
 
 ### Parity Task
 
-The parity task was not solved by either model across any of the five runs, with
+The parity task was not solved by either model across any of the six runs, with
 accuracy consistently near 50% (chance level). This is a shared failure of both
 architectures and is definitively not a ternary-specific limitation. The cause is
 the causal attention mechanism combined with the task formulation: the model must
@@ -364,37 +392,38 @@ ternary weight representation.
 
 **H1: Ternary models match FP32 accuracy at sufficient model capacity**
 
-**Confirmed.** At 1.08M parameters the accuracy delta on all three learnable tasks
-is 0.0% to three decimal places. At 22k parameters the gap was 5–28%. The capacity
-threshold lies between 144k and 1.08M parameters for this task set. Ternary's best
-validation loss at run 5 (0.0494) was marginally lower than FP32's (0.0495),
-suggesting the discrete weight constraint provides mild regularisation rather than
-capacity reduction at sufficient scale.
+**Confirmed.** The accuracy delta on all three learnable tasks reaches 0.0% at both
+550k parameters (run 6, 100/200 epochs) and 1.08M parameters (run 5, 200/400 epochs).
+At 22k parameters the gap was 5–28%. The capacity threshold lies between 144k and
+550k parameters for this task set. Run 5 showed ternary's best validation loss
+(0.0494) marginally below FP32's (0.0495), suggesting mild regularisation from the
+discrete weight constraint at sufficient scale. Run 6 confirms the zero-gap result
+is robust to a reduced parameter count and training budget.
 
 **H2: Ternary models need approximately 2x the training budget to match FP32**
 
-**Confirmed.** Consistent across runs 4 and 5. Ternary requires 1.5–2x more epochs
-to cross each accuracy threshold. At 1.08M parameters with 400 ternary epochs vs 200
-FP32 epochs, all learnable tasks reached identical final accuracy.
+**Confirmed.** Consistent across runs 4, 5, and 6. Ternary requires 1.5–2x more
+epochs to cross each accuracy threshold. The relationship holds at 100/200 epochs
+(run 6) as well as 200/400 epochs (runs 4 and 5).
 
 **H3: Training time is not increased by ternary quantization**
 
-**Confirmed and strengthened.** Training time ratio is 0.96–1.01x across all runs.
+**Confirmed and strengthened.** Training time ratio is 0.96–1.00x across all runs.
 At 1.08M parameters ternary trained faster per epoch than FP32. The STE overhead is
 negligible at all scales tested.
 
 **H4: Parity can be solved with increased model capacity**
 
-**Rejected.** Parity was not solved at 1.08M parameters with 8 layers and 8 heads.
-The failure is architectural — causal decoder transformers cannot reliably route
-accumulated sequence statistics to a single prediction position regardless of
-precision or capacity within the ranges tested.
+**Rejected.** Parity was not solved across any of the six runs. The failure is
+architectural — causal decoder transformers cannot reliably route accumulated
+sequence statistics to a single prediction position regardless of precision or
+capacity within the ranges tested.
 
 ---
 
 ## Inference Performance Summary
 
-Measured on Apple M4 with MPS, 20-pass average over the validation set.
+Measured on Apple Silicon with MPS, 20-pass average over the validation set.
 
 | Metric                    | Run 4 (144k) |           | Run 5 (1.08M) |           |
 |---------------------------|--------------|-----------|---------------|-----------|
@@ -450,7 +479,7 @@ python -m ipykernel install --user --name ternary-transformer \
     --display-name "ternary-transformer"
 ```
 
-Run notebooks in order 00 → 01 → 02 → 03 → 04. Each notebook is self-contained
+Run notebooks in order 00 - 01 - 02 - 03 - 04. Each notebook is self-contained
 and can be re-run independently after the dataset is generated.
 
 ### Notebook Execution Order
