@@ -97,6 +97,8 @@ Both models are trained with AdamW. The float32 model uses LR = 3×10⁻⁴ thro
 Cosine annealing with warm restarts (T₀=50, T_mult=2) is used from run 4 onward.
 All experiments from run 2 onward use Apple M4 with MPS acceleration.
 
+<img width="1427" height="476" alt="loss_curves" src="https://github.com/user-attachments/assets/b1843c09-2a0f-407e-a21f-8afb6329e81a" />
+
 ---
 
 ## Experimental Runs
@@ -294,9 +296,7 @@ The ternary-FP32 accuracy gap is primarily determined by model capacity.
 | 4   | 144,128   | -1.1%           | -0.2%          | -0.3%        |
 | 5   | 1,080,320 | **0.0%**        | **0.0%**       | **0.0%**     |
 
-<!-- INSERT: accuracy_gap_vs_params.png — line plot of fibonacci/fizzbuzz/primes delta
-     across all 5 runs, x-axis parameter count, y-axis accuracy delta. Shows the
-     nonlinear convergence to zero. -->
+<img width="1428" height="946" alt="per_task_accuracy" src="https://github.com/user-attachments/assets/289e7389-392d-4198-b47a-8dbf1c278844" />
 
 The relationship is nonlinear. Doubling parameters from 22k produced minimal
 improvement (runs 1 vs 2). A 6.5x increase to 144k produced near-complete gap
@@ -311,16 +311,17 @@ to reliably encode the decision boundaries of each task.
 | 4   | 144,128   | 0.636x (1.57x faster) | 1.76x              |
 | 5   | 1,080,320 | 0.653x (1.53x faster) | 1.86x              |
 
-<!-- INSERT: inference_speed_memory.png — dual-axis bar chart showing inference
-     speed ratio and memory compression ratio for runs 4 and 5 side by side. -->
-
 Inference advantage is consistent across model sizes and attributable to reduced
 memory bandwidth pressure during weight loading. This is a conservative lower bound —
 on purpose-built ternary hardware (ESP32-P4 PIE SIMD) the advantage is 20–25x.
 
 ### Ternary Weight Distribution Dynamics
 
+<img width="1187" height="468" alt="weight_churn" src="https://github.com/user-attachments/assets/ef3d7c0d-7d55-47c0-bfb4-b0b709b178a2" />
+
 Across all runs the zero fraction followed a consistent lifecycle:
+
+<img width="1548" height="468" alt="ternary_weight_distribution" src="https://github.com/user-attachments/assets/45e15fc1-f9dd-4dc4-a631-77f7af7f9788" />
 
 1. **Initialisation** — nearly all weights at zero (std=0.02 initialisation places
    most latent weights below τ=0.05)
@@ -334,10 +335,6 @@ The final zero fraction decreased monotonically with model size and training bud
 from 50.1% in run 1 to 34.1% in run 5. The weight distribution became increasingly
 symmetric across runs, approaching a near-uniform split at 1.08M parameters.
 
-<!-- INSERT: zero_fraction_churn.png — dual-axis plot showing zero fraction and
-     weight churn over training epochs for run 5, illustrating the cascade at
-     epoch ~160 and the churn halving by epoch 250. -->
-
 ### Training Time
 
 Ternary and float32 models train at effectively identical speed per epoch across all
@@ -345,6 +342,8 @@ runs (ratio 0.96–1.01x). At 1.08M parameters ternary was marginally faster per
 likely because the more stable and lower-magnitude gradients (norm 0.2551 vs 0.4433)
 reduce optimizer state update costs. The STE overhead is negligible compared to
 attention computation and data loading at all scales tested.
+
+<img width="1187" height="468" alt="gradient_norms" src="https://github.com/user-attachments/assets/befc333e-3f06-4c84-9ed4-9fb8ef233505" />
 
 ### Parity Task
 
