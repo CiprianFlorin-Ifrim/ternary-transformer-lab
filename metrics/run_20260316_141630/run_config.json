@@ -1,0 +1,21 @@
+{
+  "run_name": "run_20260316_141630",
+  "epochs": 300,
+  "batch_size": 64,
+  "lr_fp32": 0.0003,
+  "lr_ternary": 0.001,
+  "weight_decay": 0.0001,
+  "ternary_thresh": 0.05,
+  "embed_dim": 32,
+  "num_heads": 2,
+  "num_layers": 2,
+  "ff_dim": 64,
+  "dropout": 0.1,
+  "seq_len": 128,
+  "vocab_size": 15,
+  "n_samples": 10000,
+  "train_samples": 9000,
+  "val_samples": 1000,
+  "device": "mps",
+  "seed": 42
+}

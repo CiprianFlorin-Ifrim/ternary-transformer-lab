@@ -1,7 +1,5 @@
 # Generated experiment artefacts -- excluded from version control
 data/
-checkpoints/
-metrics/
 
 # Python
 __pycache__/
