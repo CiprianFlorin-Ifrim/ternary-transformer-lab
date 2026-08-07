@@ -16,3 +16,6 @@ __pycache__/
 
 # MacOS
 .DS_Store
+
+# macOS, and the AppleDouble sidecar that exFAT writes beside every file
+._*
