@@ -56,7 +56,7 @@ increases at each step.
 Both models have the same transformer architecture. One structural difference exists.
 The float32 model uses `nn.Linear` for the feed-forward layers. The ternary model uses
 a custom `TernaryLinear` layer, which projects the weights to {-1, 0, +1} in the
-forward pass. In both models the token embeddings, the layer normalisations, the
+forward pass. In both models the token embeddings, the layer normalizations, the
 attention projections and the output head stay float32.
 
 The ternary quantization uses a threshold rule with tau = 0.05:
@@ -92,7 +92,7 @@ statistics alone.
 | Parity    | Given a complete bit string, predict the single parity bit at the end |
 | Primes    | Next-token prediction over consecutive prime digit sequences          |
 
-Each task serialises over a vocabulary of 15 tokens: the digits 0 to 9, FIZZ, BUZZ,
+Each task serializes over a vocabulary of 15 tokens: the digits 0 to 9, FIZZ, BUZZ,
 FIZZBUZZ, SEP and PAD. Each sequence is 128 tokens long.
 
 We changed the parity task in the middle of the experiment series. The first form
@@ -116,7 +116,7 @@ T_mult=2. All experiments from run 2 onward use Apple Silicon with MPS accelerat
 
 ### Run 1: Baseline
 
-**Purpose:** Establish the baseline behaviour of ternary training at small scale.
+**Purpose:** Establish the baseline behavior of ternary training at small scale.
 
 | Parameter     | Value          |
 |---------------|----------------|
@@ -222,7 +222,7 @@ gives the first measurements of inference speed and memory footprint.
 budget. FP32 at 200 epochs and ternary at 400 epochs reached almost identical accuracy
 on all learnable tasks. Ternary always needed 1.5x to 2x more epochs to cross each
 accuracy threshold. On MPS the ternary model ran 1.57x faster, although MPS has no
-optimisation for ternary arithmetic.
+optimization for ternary arithmetic.
 
 | Metric                  | FP32   | Ternary | Delta   |
 |-------------------------|--------|---------|---------|
@@ -256,7 +256,7 @@ tests whether more depth solves the parity task failure.
 **Key observation:** The accuracy gap closed completely on all three learnable tasks.
 Fibonacci, fizzbuzz and primes all show a 0.0% delta to three decimal places. The best
 validation loss of ternary (0.0494) was a little below the FP32 value (0.0495). At this
-scale the discrete weight constraint therefore acts as a mild regulariser and not as a
+scale the discrete weight constraint therefore acts as a mild regularizer and not as a
 capacity limit. The zero fraction settled at 34.1%. The distribution is almost
 symmetric: -1 at 33.1%, 0 at 34.1%, and +1 at 32.8%.
 
@@ -363,12 +363,12 @@ In all runs the zero fraction followed the same lifecycle:
 
 <img width="1548" height="468" alt="ternary_weight_distribution" src="https://github.com/user-attachments/assets/45e15fc1-f9dd-4dc4-a631-77f7af7f9788" />
 
-1. **Initialisation**: almost all the weights sit at zero. The std=0.02 initialisation
+1. **Initialization**: almost all the weights sit at zero. The std=0.02 initialization
    puts most latent weights below tau=0.05.
 2. **Dead zone**: the optimizer builds momentum, and no ternary transition is visible.
 3. **Cascade**: the weights commit fast to {-1, +1} after the latent magnitudes cross
    tau. The weight churn peaks here.
-4. **Stabilisation**: the churn decays as the weights settle.
+4. **Stabilization**: the churn decays as the weights settle.
 5. **Fine-tuning**: slow continued improvement at low churn.
 
 The final zero fraction decreased monotonically with the model size and the training
@@ -411,7 +411,7 @@ parameters (run 6, 100/200 epochs) and at 1.08M parameters (run 5, 200/400 epoch
 22k parameters the gap was 5% to 28%. The capacity threshold is between 144k and 550k
 parameters for this task set. In run 5 the best ternary validation loss (0.0494) was a
 little below the FP32 value (0.0495). At a large enough scale the discrete weight
-constraint therefore gives mild regularisation. Run 6 shows that the zero-gap result
+constraint therefore gives mild regularization. Run 6 shows that the zero-gap result
 survives a lower parameter count and a shorter training budget.
 
 **H2: Ternary models need about 2x the training budget to match FP32**
@@ -450,7 +450,7 @@ validation set.
 | Speed ratio               | 1.000x       | 0.636x    | 1.000x        | 0.653x    |
 
 The inference advantage on MPS comes from less pressure on the memory bandwidth when
-the model reads the weights in the forward pass. MPS hardware has no optimisation for
+the model reads the weights in the forward pass. MPS hardware has no optimization for
 ternary arithmetic, so this figure is a conservative lower bound. The companion project
 `mcu-ternary-matmul` measured a 20x to 25x speedup over plain C INT8 for the same
 weight format. It ran on hardware that is built for the job, with the PIE SIMD
@@ -527,6 +527,6 @@ You can run one notebook again on its own after you generate the dataset.
 This project is one part of a larger investigation into ternary neural networks on
 microcontroller hardware. The companion project `mcu-ternary-matmul` benchmarks four
 approaches to ternary matrix-vector multiplication. It runs on the ESP32-P4
-microcontroller with PIE SIMD assembly. It confirms that embedded hardware can realise
+microcontroller with PIE SIMD assembly. It confirms that embedded hardware can realize
 the memory savings and the compute savings of ternary weights. The speedup is 20x to
 25x over plain C INT8.
